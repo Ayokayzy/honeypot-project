@@ -1,0 +1,21 @@
+# Render Blueprint. Render reads this on first deploy and configures the service,
+# so there is nothing to fill in by hand in the dashboard.
+services:
+  - type: web
+    name: honeypot
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/ping
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Pinned rather than left to Render's default so better-sqlite3 resolves a
+      # prebuilt binary instead of compiling from source during the build.
+      - key: NODE_VERSION
+        value: "22"
+      # Render generates this secret and shows it in the dashboard; GET /api/logs
+      # requires it. Without it that endpoint 404s in production.
+      - key: LOGS_TOKEN
+        generateValue: true

@@ -15,9 +15,12 @@ All npm dependencies live in `backend/`, but the server is normally launched fro
 its relative paths (`../frontend`, `../data`) resolve:
 
 ```
-cd backend && npm install     # install deps
-node backend/server.js        # run from project root — serves on http://localhost:8080
+npm install                   # install deps (root package.json drives deployment too)
+npm start                     # run from project root — serves on http://localhost:8080
+npm run analyze               # tactic-frequency report from the local DB
 ```
+
+`PORT`, `DB_PATH` and `LOGS_TOKEN` are read from the environment; the defaults above apply when unset.
 
 There is no build step, no linter, and no test suite (`npm test` is still the npm placeholder that exits 1).
 To verify the server is up: `curl http://localhost:8080/api/ping`.
@@ -61,8 +64,37 @@ and see a complete transcript.
 - `POST /api/message` — follow-up turns; requires `applicant_id` and `message`.
 - `GET  /api/logs` — dumps both tables, for the analysis script and demo screenshots.
 
+## Deployment
+
+Deployed on Render's free tier as a Blueprint; `render.yaml` configures the service, so the
+dashboard needs nothing filled in. `npm ci` builds, `npm start` runs, `/api/ping` is the health check.
+
+Two consequences of the free tier worth remembering:
+
+- **The disk is ephemeral and the service sleeps after ~15 minutes idle.** Conversations logged in
+  production are lost on every restart, sleep and redeploy. The authoritative research data is the
+  local `data/honeypot.db`; treat the deployed instance as a demo, not as a collection point. Moving
+  to a host with a persistent volume (Fly.io) or hosted Postgres/Turso is what changes this.
+- First request after sleeping takes ~30-60s to answer.
+
+`GET /api/logs` requires `LOGS_TOKEN` in production (as `?token=` or an `X-Logs-Token` header) and
+404s when the variable is unset; Render generates the value. Locally the route stays open.
+
+The bait page carries a `noindex` meta tag and `frontend/robots.txt` disallows everything. This is
+deliberate and should stay: the page imitates an institutional scholarship portal, so a real
+applicant arriving via search is a failure mode. Keeping it unindexed preserves the deception for
+people sent the link without exposing it to people who weren't.
+
+`data/` is gitignored because the DB holds names, emails, phone numbers and IPs.
+
 ## Current state
 
-`frontend/` and `scripts/` exist but are empty. `server.js` already mounts `frontend/` as static at the site
-root, so the bait page belongs there and will be served without any route changes. The analysis tooling that
-`/api/logs` was written for is the intended contents of `scripts/`.
+The bait page is `frontend/index.html` — a single self-contained file (inline CSS and JS, no build).
+It submits to `/api/apply`, then swaps the form out for a chat thread driven by `/api/message`,
+holding `applicant_id` in a module-scoped variable, so a page reload ends the conversation.
+
+`scripts/analyze.js` reads the DB read-only and prints the tactic-frequency table intended as
+"Table 1" in the write-up. It has its own `package.json`, but `npm run analyze` from the root works too.
+
+Not yet present: rate limiting on the public write endpoints, and any persistence of `applicant_id`
+across reloads.
