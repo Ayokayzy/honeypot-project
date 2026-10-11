@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Keep this out of search results: the page imitates an institutional portal, and
+     real scholarship seekers finding it via search is a failure mode, not traffic. -->
+<meta name="robots" content="noindex, nofollow">
+<title>National University Scholarship Coordination Portal</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", Times, serif;
+    background: #f5efe0;
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #14532d;
+    color: #fff;
+    padding: 28px 24px;
+    border-bottom: 4px solid #b58a2a;
+    text-align: center;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: 0.5px;
+  }
+  header p {
+    margin: 8px 0 0;
+    font-size: 15px;
+    font-style: italic;
+    opacity: 0.9;
+  }
+  main {
+    flex: 1;
+    max-width: 720px;
+    width: 100%;
+    margin: 32px auto;
+    padding: 0 20px;
+  }
+  .card {
+    background: #ffffff;
+    border: 1px solid #d4c9a8;
+    border-radius: 4px;
+    padding: 28px 32px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+  .card h2 {
+    margin-top: 0;
+    color: #14532d;
+    border-bottom: 1px solid #d4c9a8;
+    padding-bottom: 10px;
+    font-size: 20px;
+  }
+  .intro {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  label {
+    display: block;
+    margin-top: 16px;
+    font-weight: bold;
+    font-size: 14px;
+    color: #333;
+  }
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea {
+    width: 100%;
+    padding: 10px 12px;
+    margin-top: 6px;
+    border: 1px solid #b8ac8a;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 15px;
+    background: #fdfbf3;
+    color: #222;
+  }
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: #14532d;
+    background: #fff;
+  }
+  button {
+    margin-top: 20px;
+    background: #14532d;
+    color: #fff;
+    border: none;
+    padding: 11px 24px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  button:hover { background: #0f3d21; }
+  button:disabled { background: #888; cursor: not-allowed; }
+
+  #chat-section { display: none; }
+  #thread {
+    background: #fdfbf3;
+    border: 1px solid #d4c9a8;
+    border-radius: 3px;
+    padding: 16px;
+    min-height: 240px;
+    max-height: 420px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+  }
+  .bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    margin: 8px 0;
+    border-radius: 12px;
+    font-size: 15px;
+    line-height: 1.4;
+    font-family: Georgia, serif;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .bubble.scammer {
+    background: #ececec;
+    color: #222;
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+  }
+  .bubble.persona {
+    background: #d9ecd4;
+    color: #1a3d1a;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+  }
+  .row {
+    display: flex;
+    flex-direction: column;
+  }
+  .row.left { align-items: flex-start; }
+  .row.right { align-items: flex-end; }
+  .meta {
+    font-size: 11px;
+    color: #666;
+    margin: 2px 6px;
+    font-style: italic;
+  }
+  #reply-form textarea { min-height: 70px; }
+  .error {
+    color: #a02020;
+    font-size: 13px;
+    margin-top: 10px;
+  }
+  footer {
+    text-align: center;
+    padding: 18px 12px;
+    font-size: 12px;
+    color: #777;
+    font-style: italic;
+    border-top: 1px solid #d4c9a8;
+    background: #efe7d0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>National University Scholarship Coordination Portal</h1>
+  <p>2026 International Scholarship Batch — Applicant Verification &amp; Support</p>
+</header>
+
+<main>
+  <section id="form-section" class="card">
+    <h2>Applicant Registration &amp; Enquiry</h2>
+    <p class="intro">
+      Prospective beneficiaries of the 2026 International Scholarship Batch are required to
+      complete the form below. A coordination officer will respond to your enquiry through
+      this portal. Please provide accurate contact details for verification purposes.
+    </p>
+    <form id="apply-form">
+      <label for="full_name">Full Name</label>
+      <input type="text" id="full_name" name="full_name" required>
+
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" required>
+
+      <label for="phone">Phone Number</label>
+      <input type="tel" id="phone" name="phone" required>
+
+      <label for="message">Message / Enquiry</label>
+      <textarea id="message" name="message" required placeholder="State your enquiry, application details, or any information the coordination officer should know."></textarea>
+
+      <button type="submit" id="submit-btn">Submit Application</button>
+      <div id="form-error" class="error"></div>
+    </form>
+  </section>
+
+  <section id="chat-section" class="card">
+    <h2>Coordination Officer — Conversation</h2>
+    <p class="intro">
+      Your enquiry has been received. Please continue the conversation below with your
+      assigned coordination officer.
+    </p>
+    <div id="thread"></div>
+    <form id="reply-form">
+      <label for="reply-message">Your Reply</label>
+      <textarea id="reply-message" required></textarea>
+      <button type="submit" id="send-btn">Send</button>
+      <div id="reply-error" class="error"></div>
+    </form>
+  </section>
+</main>
+
+<footer>
+  This is a research prototype interface. Not a real institutional system.
+</footer>
+
+<script>
+  const API_BASE = "";
+  let applicantId = null;
+
+  const formSection = document.getElementById("form-section");
+  const chatSection = document.getElementById("chat-section");
+  const applyForm = document.getElementById("apply-form");
+  const replyForm = document.getElementById("reply-form");
+  const thread = document.getElementById("thread");
+  const submitBtn = document.getElementById("submit-btn");
+  const sendBtn = document.getElementById("send-btn");
+  const formError = document.getElementById("form-error");
+  const replyError = document.getElementById("reply-error");
+
+  function appendBubble(sender, text) {
+    const row = document.createElement("div");
+    row.className = "row " + (sender === "persona" ? "right" : "left");
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + (sender === "persona" ? "persona" : "scammer");
+    bubble.textContent = text;
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = sender === "persona" ? "Coordination Officer" : "You";
+
+    row.appendChild(meta);
+    row.appendChild(bubble);
+    thread.appendChild(row);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  applyForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    formError.textContent = "";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting...";
+
+    const payload = {
+      full_name: document.getElementById("full_name").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      message: document.getElementById("message").value.trim()
+    };
+
+    try {
+      const res = await fetch(API_BASE + "/api/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Server returned " + res.status);
+      const data = await res.json();
+      applicantId = data.applicant_id;
+
+      formSection.style.display = "none";
+      chatSection.style.display = "block";
+
+      appendBubble("scammer", payload.message);
+      appendBubble("persona", data.reply);
+    } catch (err) {
+      console.error("apply failed:", err);
+      formError.textContent = "Unable to submit at this time. Please try again shortly.";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Application";
+    }
+  });
+
+  replyForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    replyError.textContent = "";
+    if (!applicantId) {
+      replyError.textContent = "Session expired. Please refresh and reapply.";
+      return;
+    }
+    const textarea = document.getElementById("reply-message");
+    const message = textarea.value.trim();
+    if (!message) return;
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Sending...";
+
+    appendBubble("scammer", message);
+    textarea.value = "";
+
+    try {
+      const res = await fetch(API_BASE + "/api/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicant_id: applicantId, message: message })
+      });
+      if (!res.ok) throw new Error("Server returned " + res.status);
+      const data = await res.json();
+      appendBubble("persona", data.reply);
+    } catch (err) {
+      console.error("message failed:", err);
+      replyError.textContent = "Unable to send message. Please try again shortly.";
+    } finally {
+      sendBtn.disabled = false;
+      sendBtn.textContent = "Send";
+    }
+  });
+</script>
+
+</body>
+</html>

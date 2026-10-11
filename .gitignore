@@ -1,0 +1,11 @@
+node_modules/
+
+# Collected conversation data: contains names, emails, phone numbers and IPs.
+# This is the research artifact and stays local — never commit or deploy it.
+data/
+*.db
+*.db-journal
+*.db-wal
+
+.env
+.DS_Store

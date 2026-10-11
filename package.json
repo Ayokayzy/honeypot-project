@@ -1,0 +1,19 @@
+{
+  "name": "honeypot-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scam-baiting honeypot: bait page, tactic classifier and conversation logger",
+  "license": "ISC",
+  "scripts": {
+    "start": "node backend/server.js",
+    "analyze": "node scripts/analyze.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}

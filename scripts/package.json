@@ -1,0 +1,13 @@
+{
+  "name": "honeypot-analyze",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Analysis script for honeypot conversation logs",
+  "main": "analyze.js",
+  "scripts": {
+    "analyze": "node analyze.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  }
+}
