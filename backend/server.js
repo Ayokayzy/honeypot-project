@@ -16,6 +16,40 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
+// Statements are prepared once at startup instead of inside each handler, and the
+// multi-row writes below run inside a transaction so a submission costs one commit
+// rather than three. Both matter when a room full of people submits at once.
+const insertApplicant = db.prepare(`
+  INSERT INTO applicants (full_name, email, phone, message, ip_address, user_agent)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+
+const insertLogEntry = db.prepare(`
+  INSERT INTO conversation_log (applicant_id, sender, content, tactic_tags)
+  VALUES (?, ?, ?, ?)
+`);
+
+// Writes the applicant plus both sides of the opening exchange. The scammer's first
+// message is logged here too, so conversation_log holds the whole interaction.
+const recordApplication = db.transaction((applicant, openingMessage, tags, reply) => {
+  const info = insertApplicant.run(
+    applicant.full_name, applicant.email, applicant.phone,
+    applicant.message, applicant.ip_address, applicant.user_agent
+  );
+  const applicantId = info.lastInsertRowid;
+  insertLogEntry.run(applicantId, 'scammer', openingMessage, tags);
+  insertLogEntry.run(applicantId, 'persona', reply, null);
+  return applicantId;
+});
+
+const recordExchange = db.transaction((applicantId, message, tags, reply) => {
+  insertLogEntry.run(applicantId, 'scammer', message, tags);
+  insertLogEntry.run(applicantId, 'persona', reply, null);
+});
+
+const selectApplicants = db.prepare('SELECT * FROM applicants ORDER BY created_at');
+const selectConversations = db.prepare('SELECT * FROM conversation_log ORDER BY created_at');
+
 // Simple health check — confirms the server is up and reachable.
 app.get('/api/ping', (req, res) => {
   res.json({ status: 'ok', message: 'Honeypot server is active', time: new Date().toISOString() });
@@ -27,24 +61,13 @@ app.post('/api/apply', (req, res) => {
   const ip_address = req.ip;
   const user_agent = req.headers['user-agent'] || '';
 
-  const stmt = db.prepare(`
-    INSERT INTO applicants (full_name, email, phone, message, ip_address, user_agent)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  const info = stmt.run(full_name, email, phone, message, ip_address, user_agent);
-  const applicantId = info.lastInsertRowid;
-
-  // Log the initial message as part of the conversation too, so all interaction lives in one table.
   const { tags, reply } = analyzeAndRespond(message || '');
-  db.prepare(`
-    INSERT INTO conversation_log (applicant_id, sender, content, tactic_tags)
-    VALUES (?, 'scammer', ?, ?)
-  `).run(applicantId, message || '', tags.join(','));
-
-  db.prepare(`
-    INSERT INTO conversation_log (applicant_id, sender, content, tactic_tags)
-    VALUES (?, 'persona', ?, NULL)
-  `).run(applicantId, reply);
+  const applicantId = recordApplication(
+    { full_name, email, phone, message, ip_address, user_agent },
+    message || '',
+    tags.join(','),
+    reply
+  );
 
   res.json({ applicant_id: applicantId, reply });
 });
@@ -58,16 +81,7 @@ app.post('/api/message', (req, res) => {
   }
 
   const { tags, reply } = analyzeAndRespond(message);
-
-  db.prepare(`
-    INSERT INTO conversation_log (applicant_id, sender, content, tactic_tags)
-    VALUES (?, 'scammer', ?, ?)
-  `).run(applicant_id, message, tags.join(','));
-
-  db.prepare(`
-    INSERT INTO conversation_log (applicant_id, sender, content, tactic_tags)
-    VALUES (?, 'persona', ?, NULL)
-  `).run(applicant_id, reply);
+  recordExchange(applicant_id, message, tags.join(','), reply);
 
   res.json({ reply });
 });
@@ -90,8 +104,8 @@ app.get('/api/logs', (req, res) => {
     }
   }
 
-  const applicants = db.prepare('SELECT * FROM applicants ORDER BY created_at').all();
-  const conversations = db.prepare('SELECT * FROM conversation_log ORDER BY created_at').all();
+  const applicants = selectApplicants.all();
+  const conversations = selectConversations.all();
   res.json({ applicants, conversations });
 });
 

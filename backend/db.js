@@ -10,6 +10,14 @@ fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 const db = new Database(DB_PATH);
 
+// Write-ahead logging lets readers run while a write is in flight and commits without
+// rewriting the rollback journal each time; NORMAL stops fsync-ing on every single commit.
+// Under a burst of concurrent submissions the default (journal_mode=delete, synchronous=FULL)
+// serialises every insert behind a disk flush, which is the dominant cost in this app.
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('busy_timeout = 5000');
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS applicants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

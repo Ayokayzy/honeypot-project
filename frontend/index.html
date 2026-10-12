@@ -229,6 +229,28 @@
   const API_BASE = "";
   let applicantId = null;
 
+  // Phone browsers discard backgrounded tabs, and someone will reload. Keeping the
+  // conversation in sessionStorage means switching apps mid-activity resumes the same
+  // thread instead of starting a second application. Wrapped because private browsing
+  // can make these throw.
+  const STORE_KEY = "honeypot.session";
+  let transcript = [];
+
+  function saveSession() {
+    try {
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({ applicantId, transcript }));
+    } catch (e) { /* storage unavailable; the conversation just won't survive a reload */ }
+  }
+
+  function loadSession() {
+    try {
+      const raw = sessionStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && parsed.applicantId ? parsed : null;
+    } catch (e) { return null; }
+  }
+
   const formSection = document.getElementById("form-section");
   const chatSection = document.getElementById("chat-section");
   const applyForm = document.getElementById("apply-form");
@@ -257,6 +279,24 @@
     thread.scrollTop = thread.scrollHeight;
   }
 
+  // Replays a stored conversation without re-recording it.
+  function restore(session) {
+    applicantId = session.applicantId;
+    transcript = session.transcript || [];
+    formSection.style.display = "none";
+    chatSection.style.display = "block";
+    for (const turn of transcript) appendBubble(turn.sender, turn.text);
+  }
+
+  function say(sender, text) {
+    transcript.push({ sender, text });
+    appendBubble(sender, text);
+    saveSession();
+  }
+
+  const existing = loadSession();
+  if (existing) restore(existing);
+
   applyForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     formError.textContent = "";
@@ -283,8 +323,8 @@
       formSection.style.display = "none";
       chatSection.style.display = "block";
 
-      appendBubble("scammer", payload.message);
-      appendBubble("persona", data.reply);
+      say("scammer", payload.message);
+      say("persona", data.reply);
     } catch (err) {
       console.error("apply failed:", err);
       formError.textContent = "Unable to submit at this time. Please try again shortly.";
@@ -307,7 +347,7 @@
     sendBtn.disabled = true;
     sendBtn.textContent = "Sending...";
 
-    appendBubble("scammer", message);
+    say("scammer", message);
     textarea.value = "";
 
     try {
@@ -318,7 +358,7 @@
       });
       if (!res.ok) throw new Error("Server returned " + res.status);
       const data = await res.json();
-      appendBubble("persona", data.reply);
+      say("persona", data.reply);
     } catch (err) {
       console.error("message failed:", err);
       replyError.textContent = "Unable to send message. Please try again shortly.";
