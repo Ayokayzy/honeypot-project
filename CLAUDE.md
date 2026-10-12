@@ -87,6 +87,39 @@ people sent the link without exposing it to people who weren't.
 
 `data/` is gitignored because the DB holds names, emails, phone numbers and IPs.
 
+### Load characteristics
+
+Measured with 90 concurrent clients each submitting a form plus three follow-ups (450 requests),
+in containers capped to match Render's CPU allowances:
+
+| Plan | CPU | page p50 | page p95 | apply p95 | throughput |
+|---|---|---|---|---|---|
+| Free | 0.1 | 3758ms | 8666ms | 1201ms | 45 req/s |
+| Starter | 0.5 | 205ms | 419ms | 404ms | 853 req/s |
+
+Nothing failed on either tier — the free tier is slow, not broken. A classroom-sized burst needs
+Starter; free is only adequate for a handful of people at a time, and it also sleeps after ~15
+minutes idle with a 30-60s cold start.
+
+The write path is the part that was optimised (WAL, batched transactions, hoisted statements). SQLite
+still allows only one writer at a time, which is fine at this scale but is the ceiling if load grows.
+
+A build takes ~2.5 minutes because `better-sqlite3` has a `binding.gyp` and no install script, so npm
+compiles it from source with node-gyp rather than fetching a prebuilt binary.
+
+### Everyone on one network shares an IP
+
+When a group submits from the same venue WiFi, every row gets the same `ip_address`, because the NAT
+presents one public address. Two consequences:
+
+- **Do not add IP-based rate limiting** without accounting for this. A naive per-IP limiter treats a
+  whole room as a single client and locks everyone out after the first few submissions.
+- `ip_address` does not distinguish participants in that data, so it cannot be used to count distinct
+  sources in any analysis of a group session.
+
+Also note `trust proxy` is set to `true`, which takes the left-most `X-Forwarded-For` value. That is
+client-supplied and therefore spoofable; it is fine for a demo but not evidence of origin.
+
 ## Current state
 
 The bait page is `frontend/index.html` — a single self-contained file (inline CSS and JS, no build).
