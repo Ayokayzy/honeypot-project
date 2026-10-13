@@ -31,6 +31,26 @@ open `frontend/index.html` through VS Code Live Server or `file://`: the page's 
 
 Inspect logged data directly with `sqlite3 data/honeypot.db` or via `GET /api/logs`.
 
+### Reporting on a deployed session
+
+`GET /api/logs` is the only way to retrieve data off a deployment, because the disk is ephemeral.
+Save it and import it into a local database:
+
+```
+curl "https://<app>.onrender.com/api/logs?token=$LOGS_TOKEN" > class-data.json
+npm run import-logs -- class-data.json          # writes data/class-data.db
+DB_PATH=data/class-data.db npm run analyze
+```
+
+`import-logs.js` defaults to `data/class-data.db`, never `data/honeypot.db`, so a stray run cannot
+overwrite locally collected data; `--db <path>` chooses another target and `--force` replaces a target
+that already holds rows. It preserves the original `id` and `created_at` values, and reuses the schema
+from `backend/db.js` rather than restating the DDL. Both it and `analyze.js` read `DB_PATH`, matching
+`backend/db.js`.
+
+Saved payloads carry the same personal data as the database, so `class-data.json`, `*-logs.json` and
+`logs-*.json` are gitignored.
+
 ## Architecture
 
 Three backend modules, no framework beyond Express 5 + better-sqlite3:

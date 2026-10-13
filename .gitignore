@@ -6,7 +6,12 @@ data/
 *.db
 *.db-journal
 *.db-wal
+*.db-shm
+
+# Saved /api/logs payloads carry the same personal data as the database.
+class-data.json
+*-logs.json
+logs-*.json
 
 .env
 .DS_Store
-*.db-shm

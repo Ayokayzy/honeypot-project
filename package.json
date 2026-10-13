@@ -6,7 +6,8 @@
   "license": "ISC",
   "scripts": {
     "start": "node backend/server.js",
-    "analyze": "node scripts/analyze.js"
+    "analyze": "node scripts/analyze.js",
+    "import-logs": "node scripts/import-logs.js"
   },
   "engines": {
     "node": ">=20"

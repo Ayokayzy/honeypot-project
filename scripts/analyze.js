@@ -1,8 +1,20 @@
 const path = require("path");
 const Database = require("better-sqlite3");
 
-const DB_PATH = path.join(__dirname, "..", "data", "honeypot.db");
-const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
+// DB_PATH matches backend/db.js, so this can report on an imported session
+// (see import-logs.js) without touching the locally collected database.
+const DB_PATH =
+  process.env.DB_PATH || path.join(__dirname, "..", "data", "honeypot.db");
+
+let db;
+try {
+  db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
+} catch (err) {
+  console.error(`\n  Cannot read ${DB_PATH}\n  ${err.message}\n`);
+  console.error("  Set DB_PATH to point at another database, or run the server once");
+  console.error("  to create one.\n");
+  process.exit(1);
+}
 
 const applicantCount = db
   .prepare("SELECT COUNT(*) AS n FROM applicants")
