@@ -1,5 +1,6 @@
 const path = require("path");
 const Database = require("better-sqlite3");
+const { detectTactics } = require("../src/detect");
 
 // DB_PATH matches backend/db.js, so this can report on an imported session
 // (see import-logs.js) without touching the locally collected database.
@@ -21,9 +22,7 @@ const applicantCount = db
   .get().n;
 
 const scammerRows = db
-  .prepare(
-    "SELECT tactic_tags FROM conversation_log WHERE sender = 'scammer' AND tactic_tags IS NOT NULL"
-  )
+  .prepare("SELECT content FROM conversation_log WHERE sender = 'scammer'")
   .all();
 
 const totalScammerMessages = scammerRows.length;
@@ -32,19 +31,14 @@ const tally = new Map();
 let unclassifiedCount = 0;
 
 for (const row of scammerRows) {
-  const tags = row.tactic_tags
-    .split(",")
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
+  const tags = detectTactics(row.content);
 
-  const uniqueTags = new Set(tags);
-
-  if (uniqueTags.has("unclassified")) {
+  if (tags.length === 0) {
     unclassifiedCount += 1;
+    continue;
   }
 
-  for (const tag of uniqueTags) {
-    if (tag === "unclassified") continue;
+  for (const tag of tags) {
     tally.set(tag, (tally.get(tag) || 0) + 1);
   }
 }

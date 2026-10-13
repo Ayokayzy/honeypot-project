@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Honeypot — Live Dashboard</title>
+<style>
+  :root {
+    --navy: #14213D;
+    --amber: #9A560A;
+    --amber-soft: #c87a1e;
+    --bg: #f5f1e8;
+    --card: #ffffff;
+    --ink: #14213D;
+    --mute: #5a5a5a;
+    --grey-chip: #d9d9d9;
+    --grey-chip-ink: #333;
+  }
+
+  /* Tactic palette — each tactic gets its own chip and bar colour so the eye can
+     follow one tactic across the summary tiles, the bar chart and the session list. */
+  :root {
+    --t-urgency: #B23A48;
+    --t-payment_request: #0F6E5A;
+    --t-authority_claim: #4A3AB2;
+    --t-personal_info_request: #9A560A;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 18px;
+    line-height: 1.45;
+  }
+
+  header {
+    background: var(--navy);
+    color: #fff;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    border-bottom: 6px solid var(--amber);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 32px;
+    letter-spacing: 0.3px;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 18px;
+  }
+  .controls button {
+    font-size: 18px;
+    font-weight: 600;
+    padding: 10px 18px;
+    border: 2px solid #fff;
+    background: transparent;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .controls button:hover { background: rgba(255,255,255,0.15); }
+  .controls button.paused {
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .updated { opacity: 0.9; font-variant-numeric: tabular-nums; }
+
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 32px 48px;
+  }
+
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 32px 0 16px;
+    border-bottom: 2px solid var(--amber);
+    padding-bottom: 6px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+
+  .tile {
+    background: var(--card);
+    border-left: 8px solid var(--amber);
+    border-radius: 8px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .tile .label {
+    font-size: 16px;
+    color: var(--mute);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+  }
+  .tile .value {
+    font-size: 44px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-top: 8px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .tile .sub {
+    font-size: 18px;
+    color: var(--amber);
+    margin-top: 4px;
+    font-weight: 600;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 24px 28px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    border-top: 4px solid var(--navy);
+  }
+  .chart-wrap { position: relative; height: 320px; }
+
+  .empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--mute);
+    font-size: 20px;
+    font-style: italic;
+  }
+
+  .session {
+    background: var(--card);
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    border-left: 6px solid var(--navy);
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .session summary {
+    cursor: pointer;
+    padding: 16px 22px;
+    font-size: 19px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    list-style: none;
+    user-select: none;
+  }
+  .session summary::-webkit-details-marker { display: none; }
+  .session summary::before {
+    content: "▸";
+    color: var(--amber);
+    font-size: 18px;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+    display: inline-block;
+  }
+  .session[open] summary::before { transform: rotate(90deg); }
+  .session summary:hover { background: #f9f3e6; }
+
+  .session .sid { font-weight: 700; color: var(--navy); }
+  .session .meta { color: var(--mute); font-size: 16px; font-variant-numeric: tabular-nums; }
+  .session .count { color: var(--amber); font-weight: 600; font-size: 16px; }
+
+  .messages {
+    border-top: 1px solid #eee;
+    padding: 16px 22px 22px;
+  }
+  .msg {
+    padding: 12px 0;
+    border-bottom: 1px solid #f0ecdf;
+  }
+  .msg:last-child { border-bottom: none; }
+  .msg .who {
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .msg.scammer .who { color: var(--t-urgency); }
+  .msg.persona .who { color: var(--navy); }
+  .msg .text {
+    margin: 6px 0;
+    font-size: 18px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chip {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.2px;
+  }
+  .chip.urgency { background: var(--t-urgency); }
+  .chip.payment_request { background: var(--t-payment_request); }
+  .chip.authority_claim { background: var(--t-authority_claim); }
+  .chip.personal_info_request { background: var(--t-personal_info_request); }
+  .chip.none {
+    background: var(--grey-chip);
+    color: var(--grey-chip-ink);
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Honeypot — Live Dashboard</h1>
+  <div class="controls">
+    <span class="updated" id="updated">updated: —</span>
+    <button type="button" id="toggle">Pause</button>
+  </div>
+</header>
+
+<main>
+  <div class="section-title">Summary</div>
+  <div class="tiles">
+    <div class="tile"><div class="label">Sessions</div><div class="value" id="t-sessions">—</div></div>
+    <div class="tile"><div class="label">Scammer messages</div><div class="value" id="t-messages">—</div></div>
+    <div class="tile"><div class="label">No clear tactic</div><div class="value" id="t-untagged">—</div></div>
+    <div class="tile">
+      <div class="label">Top tactic</div>
+      <div class="value" id="t-top">—</div>
+      <div class="sub" id="t-top-pct"></div>
+    </div>
+  </div>
+
+  <div class="section-title">Tactic frequency</div>
+  <div class="card">
+    <div class="chart-wrap" id="tactic-wrap">
+      <canvas id="tactic-chart"></canvas>
+    </div>
+    <div class="empty" id="tactic-empty" style="display:none;">No scammer messages yet.</div>
+  </div>
+
+  <div class="section-title">Scammer messages per day</div>
+  <div class="card">
+    <div class="chart-wrap" id="timeline-wrap">
+      <canvas id="timeline-chart"></canvas>
+    </div>
+    <div class="empty" id="timeline-empty" style="display:none;">No activity recorded yet.</div>
+  </div>
+
+  <div class="section-title">Recent sessions</div>
+  <div id="sessions"></div>
+  <div class="empty" id="sessions-empty" style="display:none;">No sessions yet — waiting for first contact.</div>
+</main>
+
+<script src="/vendor/chart.js/chart.umd.js"></script>
+<script>
+  // Dashboard script. Fetches /api/stats on an interval, redraws the two Chart.js
+  // charts in place, and re-renders the session list. All text that originates in
+  // the DB is written with textContent — scammer messages are untrusted input.
+  (function () {
+    const TACTIC_ORDER = ['urgency', 'payment_request', 'authority_claim', 'personal_info_request'];
+    const TACTIC_LABELS = {
+      urgency: 'Urgency',
+      payment_request: 'Payment request',
+      authority_claim: 'Authority claim',
+      personal_info_request: 'Personal info request',
+    };
+    const TACTIC_COLORS = {
+      urgency: '#B23A48',
+      payment_request: '#0F6E5A',
+      authority_claim: '#4A3AB2',
+      personal_info_request: '#9A560A',
+    };
+    const NAVY = '#14213D';
+    const AMBER = '#9A560A';
+    const REFRESH_MS = 5000;
+
+    Chart.defaults.font.size = 15;
+    Chart.defaults.color = NAVY;
+
+    let tacticChart = null;
+    let timelineChart = null;
+    let timer = null;
+    let paused = false;
+    // Preserves which <details> sessions the user has opened across refreshes;
+    // without this an auto-refresh collapses whatever session you're reading.
+    const openSessions = new Set();
+
+    const $ = (id) => document.getElementById(id);
+
+    function fmtTime(d) {
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      const s = String(d.getSeconds()).padStart(2, '0');
+      return h + ':' + m + ':' + s;
+    }
+
+    function renderTiles(stats) {
+      $('t-sessions').textContent = stats.totals.sessions;
+      $('t-messages').textContent = stats.totals.scammer_messages;
+      $('t-untagged').textContent = stats.totals.no_tactic_messages;
+
+      let topName = '—';
+      let topPct = '';
+      let topCount = -1;
+      for (const tag of TACTIC_ORDER) {
+        const row = stats.tactics[tag];
+        if (row && row.count > topCount) {
+          topCount = row.count;
+          topName = TACTIC_LABELS[tag];
+          topPct = row.percentage + '% of messages';
+        }
+      }
+      if (stats.totals.scammer_messages === 0 || topCount <= 0) {
+        topName = '—';
+        topPct = '';
+      }
+      $('t-top').textContent = topName;
+      $('t-top-pct').textContent = topPct;
+    }
+
+    function renderTacticChart(stats) {
+      const empty = stats.totals.scammer_messages === 0;
+      $('tactic-wrap').style.display = empty ? 'none' : '';
+      $('tactic-empty').style.display = empty ? '' : 'none';
+      if (empty) {
+        if (tacticChart) { tacticChart.destroy(); tacticChart = null; }
+        return;
+      }
+
+      const labels = TACTIC_ORDER.map((t) => TACTIC_LABELS[t]);
+      const data = TACTIC_ORDER.map((t) => stats.tactics[t].count);
+      const pct = TACTIC_ORDER.map((t) => stats.tactics[t].percentage);
+      const colors = TACTIC_ORDER.map((t) => TACTIC_COLORS[t]);
+
+      if (tacticChart) {
+        tacticChart.data.labels = labels;
+        tacticChart.data.datasets[0].data = data;
+        tacticChart.data.datasets[0].backgroundColor = colors;
+        tacticChart.$pct = pct;
+        tacticChart.update();
+        return;
+      }
+
+      tacticChart = new Chart($('tactic-chart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: colors,
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const i = ctx.dataIndex;
+                  const chart = ctx.chart;
+                  const p = chart.$pct ? chart.$pct[i] : null;
+                  return ctx.parsed.x + (p !== null ? ' (' + p + '%)' : '');
+                },
+              },
+            },
+          },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e5dfca' } },
+            y: { grid: { display: false } },
+          },
+          animation: false,
+        },
+        plugins: [{
+          id: 'barLabels',
+          afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            const meta = chart.getDatasetMeta(0);
+            const pcts = chart.$pct || [];
+            ctx.save();
+            ctx.font = '600 15px -apple-system, Segoe UI, sans-serif';
+            ctx.fillStyle = NAVY;
+            ctx.textBaseline = 'middle';
+            meta.data.forEach((bar, i) => {
+              const value = chart.data.datasets[0].data[i];
+              const p = pcts[i];
+              const label = value + (p !== undefined ? '  (' + p + '%)' : '');
+              ctx.fillText(label, bar.x + 8, bar.y);
+            });
+            ctx.restore();
+          },
+        }],
+      });
+      tacticChart.$pct = pct;
+    }
+
+    function renderTimelineChart(stats) {
+      const empty = !stats.timeline || stats.timeline.length === 0;
+      $('timeline-wrap').style.display = empty ? 'none' : '';
+      $('timeline-empty').style.display = empty ? '' : 'none';
+      if (empty) {
+        if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+        return;
+      }
+
+      const labels = stats.timeline.map((r) => r.date);
+      const data = stats.timeline.map((r) => r.count);
+
+      if (timelineChart) {
+        timelineChart.data.labels = labels;
+        timelineChart.data.datasets[0].data = data;
+        timelineChart.update();
+        return;
+      }
+
+      timelineChart = new Chart($('timeline-chart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: AMBER,
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => ctx.parsed.y + ' messages' } },
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e5dfca' } },
+          },
+          animation: false,
+        },
+      });
+    }
+
+    function renderSessions(stats) {
+      const container = $('sessions');
+      const sessions = stats.sessions || [];
+      $('sessions-empty').style.display = sessions.length === 0 ? '' : 'none';
+      container.replaceChildren();
+
+      for (const s of sessions) {
+        const details = document.createElement('details');
+        details.className = 'session';
+        if (openSessions.has(s.id)) details.open = true;
+        details.addEventListener('toggle', () => {
+          if (details.open) openSessions.add(s.id);
+          else openSessions.delete(s.id);
+        });
+
+        const summary = document.createElement('summary');
+
+        const sid = document.createElement('span');
+        sid.className = 'sid';
+        sid.textContent = 'Session #' + s.id;
+
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = s.start || '';
+
+        const count = document.createElement('span');
+        count.className = 'count';
+        const n = (s.messages || []).length;
+        count.textContent = n + ' message' + (n === 1 ? '' : 's');
+
+        const left = document.createElement('span');
+        left.appendChild(sid);
+        left.appendChild(document.createTextNode('  '));
+        left.appendChild(meta);
+        summary.appendChild(left);
+        summary.appendChild(count);
+        details.appendChild(summary);
+
+        const messages = document.createElement('div');
+        messages.className = 'messages';
+        for (const m of s.messages || []) {
+          const row = document.createElement('div');
+          row.className = 'msg ' + (m.sender === 'scammer' ? 'scammer' : 'persona');
+
+          const who = document.createElement('div');
+          who.className = 'who';
+          who.textContent = m.sender === 'scammer' ? 'Scammer' : 'Persona';
+          row.appendChild(who);
+
+          const text = document.createElement('div');
+          text.className = 'text';
+          text.textContent = m.text || '';
+          row.appendChild(text);
+
+          if (m.sender === 'scammer') {
+            const chips = document.createElement('div');
+            chips.className = 'chips';
+            const tactics = m.tactics || [];
+            if (tactics.length === 0) {
+              const chip = document.createElement('span');
+              chip.className = 'chip none';
+              chip.textContent = 'no clear tactic';
+              chips.appendChild(chip);
+            } else {
+              for (const t of tactics) {
+                const chip = document.createElement('span');
+                chip.className = 'chip ' + t;
+                chip.textContent = TACTIC_LABELS[t] || t;
+                chips.appendChild(chip);
+              }
+            }
+            row.appendChild(chips);
+          }
+          messages.appendChild(row);
+        }
+        details.appendChild(messages);
+        container.appendChild(details);
+      }
+    }
+
+    function render(stats) {
+      renderTiles(stats);
+      renderTacticChart(stats);
+      renderTimelineChart(stats);
+      renderSessions(stats);
+      $('updated').textContent = 'updated: ' + fmtTime(new Date());
+    }
+
+    async function refresh() {
+      try {
+        const r = await fetch('/api/stats', { cache: 'no-store' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const stats = await r.json();
+        render(stats);
+      } catch (err) {
+        $('updated').textContent = 'updated: error (' + err.message + ')';
+      }
+    }
+
+    function schedule() {
+      if (timer) clearInterval(timer);
+      if (!paused) timer = setInterval(refresh, REFRESH_MS);
+    }
+
+    $('toggle').addEventListener('click', () => {
+      paused = !paused;
+      const btn = $('toggle');
+      btn.textContent = paused ? 'Resume' : 'Pause';
+      btn.classList.toggle('paused', paused);
+      schedule();
+      if (!paused) refresh();
+    });
+
+    refresh();
+    schedule();
+  })();
+</script>
+
+</body>
+</html>

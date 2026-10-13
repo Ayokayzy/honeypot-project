@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./db');
 const { analyzeAndRespond } = require('./responder');
+const { detectTactics, TACTIC_NAMES } = require('../src/detect');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -15,6 +16,17 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
+// Serves chart.js off the node_modules install so the dashboard works offline —
+// a classroom projector may not have outbound internet, and the page is useless
+// without the chart library.
+app.use(
+  '/vendor/chart.js',
+  express.static(path.join(__dirname, '..', 'node_modules', 'chart.js', 'dist'))
+);
+
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'dashboard.html'));
+});
 
 // Statements are prepared once at startup instead of inside each handler, and the
 // multi-row writes below run inside a transaction so a submission costs one commit
@@ -49,6 +61,18 @@ const recordExchange = db.transaction((applicantId, message, tags, reply) => {
 
 const selectApplicants = db.prepare('SELECT * FROM applicants ORDER BY created_at');
 const selectConversations = db.prepare('SELECT * FROM conversation_log ORDER BY created_at');
+
+// Stats-endpoint statements. Prepared once, same as the write path above.
+const countApplicants = db.prepare('SELECT COUNT(*) AS n FROM applicants');
+const selectScammerMessages = db.prepare(
+  "SELECT content, created_at FROM conversation_log WHERE sender = 'scammer' ORDER BY created_at"
+);
+const selectRecentApplicants = db.prepare(
+  'SELECT id, created_at FROM applicants ORDER BY created_at DESC LIMIT ?'
+);
+const selectSessionMessages = db.prepare(
+  'SELECT sender, content, created_at FROM conversation_log WHERE applicant_id = ? ORDER BY created_at'
+);
 
 // Simple health check — confirms the server is up and reachable.
 app.get('/api/ping', (req, res) => {
@@ -107,6 +131,62 @@ app.get('/api/logs', (req, res) => {
   const applicants = selectApplicants.all();
   const conversations = selectConversations.all();
   res.json({ applicants, conversations });
+});
+
+// Aggregated view for the dashboard. Tactics are re-derived from message content
+// via detectTactics at request time, so the stored tactic_tags column is not relied
+// on here and a change to the keyword rules shows up on the next request.
+app.get('/api/stats', (req, res) => {
+  const sessionCount = countApplicants.get().n;
+  const scammerMessages = selectScammerMessages.all();
+  const totalScammer = scammerMessages.length;
+
+  const tacticCounts = Object.fromEntries(TACTIC_NAMES.map((t) => [t, 0]));
+  const timelineMap = new Map();
+  let noTactic = 0;
+
+  for (const row of scammerMessages) {
+    const tactics = detectTactics(row.content);
+    if (tactics.length === 0) {
+      noTactic += 1;
+    } else {
+      for (const t of tactics) tacticCounts[t] += 1;
+    }
+    const date = (row.created_at || '').slice(0, 10);
+    timelineMap.set(date, (timelineMap.get(date) || 0) + 1);
+  }
+
+  const tactics = {};
+  for (const t of TACTIC_NAMES) {
+    const count = tacticCounts[t];
+    const pct = totalScammer === 0 ? 0 : Number(((count / totalScammer) * 100).toFixed(1));
+    tactics[t] = { count, percentage: pct };
+  }
+
+  const timeline = Array.from(timelineMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, count]) => ({ date, count }));
+
+  const sessions = selectRecentApplicants.all(20).map((a) => ({
+    id: a.id,
+    start: a.created_at,
+    messages: selectSessionMessages.all(a.id).map((m) => ({
+      sender: m.sender,
+      text: m.content,
+      tactics: m.sender === 'scammer' ? detectTactics(m.content) : [],
+    })),
+  }));
+
+  res.json({
+    totals: {
+      sessions: sessionCount,
+      scammer_messages: totalScammer,
+      no_tactic_messages: noTactic,
+    },
+    tactics,
+    timeline,
+    sessions,
+  });
 });
 
 app.listen(PORT, () => {
