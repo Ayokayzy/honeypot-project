@@ -168,17 +168,31 @@ const STAGE_HINTS = {
   5: 'This is the closing turn. Your suggestions should threaten to withdraw the offer if payment is not made immediately.',
 };
 
+// conversation_log alternates scammer, persona, scammer, persona..., so a fixed-size
+// tail can begin on a persona turn. That makes `assistant` the first message, which the
+// Messages API rejects outright: the call 400s, the catch in the handler swallows it and
+// falls back to the scripted responder, and the conversation loses all continuity from
+// that turn onward. The transcript is bounded by MAX_TURNS, so send all of it and only
+// ever trim inward from a scammer message.
+const MAX_HISTORY_MESSAGES = 24;
+
+function toLlmMessages(history) {
+  const window = history.slice(-MAX_HISTORY_MESSAGES);
+  const firstScammer = window.findIndex((m) => m.sender === 'scammer');
+  const usable = firstScammer === -1 ? [] : window.slice(firstScammer);
+  return usable.map((m) => ({
+    role: m.sender === 'persona' ? 'assistant' : 'user',
+    content: m.content,
+  }));
+}
+
 async function askPersona(history, nextTurn, tactic) {
   const hint = STAGE_HINTS[Math.min(5, Math.max(1, nextTurn || 1))];
   const chosen = tactic ? `The scammer chose the opening tactic "${tactic}".` : '';
   const system = `${PERSONA_SYSTEM_BASE} ${chosen} Current arc stage: ${hint}`;
-  // Pass the last 6 messages, in LLM {role, content} shape. Scammer -> user,
-  // persona (Amara) -> assistant.
-  const trimmed = history.slice(-6);
-  const messages = trimmed.map((m) => ({
-    role: m.sender === 'persona' ? 'assistant' : 'user',
-    content: m.content,
-  }));
+  // Scammer -> user, persona (Amara) -> assistant.
+  const messages = toLlmMessages(history);
+  if (messages.length === 0) throw new Error('no usable history to send');
   const text = await llm.complete({
     system,
     messages,
@@ -198,14 +212,29 @@ async function askPersona(history, nextTurn, tactic) {
 
 const OPENING_SYSTEM = [
   'You are helping a university lecturer run a classroom exercise where students play the role of a scammer and talk to a cautious applicant persona.',
+  // The scenario has to be stated outright. Given only a tactic name like
+  // "authority_claim", the model invents whatever authority it likes — revenue
+  // offices, police, customs — and the opening stops matching the scholarship
+  // portal the persona is answering from.
+  'The scenario is fixed: an advance-fee SCHOLARSHIP scam. The target is Amara, a 20-year-old Nigerian university student who applied for a scholarship through an online portal.',
+  'The sender must claim to represent a scholarship, admissions, university or education body, and the message must be about her scholarship application or award.',
+  'Never write a scam on any other theme. No tax, revenue, police, court, customs, parcel delivery, bank, lottery or prize-draw scams.',
   'Write one short scam-style opening message (1 to 3 sentences, under 40 words) that a scammer would send using the chosen tactic.',
   "Use only fictional organisation names and never include real phone numbers, account numbers, links or real people's names.",
   'Return JSON only, with a single key "opening" (string).',
 ].join(' ');
 
 async function askOpening(tactic) {
-  const prompt =
-    `Tactic: ${tactic}. Write the opening message as described. Return JSON like {"opening": "..."}.`;
+  // Anchor the register with one of the scripted openings for this same tactic.
+  // They are already on-theme, so showing one is a cheap way to keep the model in
+  // the scholarship scenario instead of describing it and hoping.
+  const example = fallbackOpening(tactic);
+  const prompt = [
+    `Tactic: ${tactic}.`,
+    `An on-theme example in the right register: "${example}"`,
+    'Match its scenario and tone but write different wording, names and details.',
+    'Write the opening message as described. Return JSON like {"opening": "..."}.',
+  ].join(' ');
   const text = await llm.complete({
     system: OPENING_SYSTEM,
     messages: [{ role: 'user', content: prompt }],
