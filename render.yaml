@@ -22,7 +22,41 @@ services:
       # depend on this value.
       - key: NODE_VERSION
         value: "22"
-      # Render generates this secret and shows it in the dashboard; GET /api/logs
-      # requires it. Without it that endpoint 404s in production.
+      # Render generates these and shows them in the dashboard. ADMIN_PASSWORD
+      # gates /dashboard, /api/stats and /api/logs; LOGS_TOKEN is the legacy
+      # per-request token for /api/logs.
+      - key: ADMIN_PASSWORD
+        generateValue: true
       - key: LOGS_TOKEN
         generateValue: true
+
+      # Set this in the Render dashboard, not here — render.yaml is committed to
+      # GitHub and an API key must never be.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+      - key: LLM_PROVIDER
+        value: anthropic
+      - key: LLM_MODEL
+        value: claude-haiku-5-5
+
+      # Classroom capacity. A 90-student session needs 7 calls each (one opening
+      # draft plus one per turn) = 630, and everyone scans the QR code at once, so
+      # the opening burst is ~90 calls in the first minute. The defaults (RPM 20,
+      # budget 600, 80 sessions, 3 per IP) refuse most of that and fall back to
+      # scripted replies. Raising LLM_RPM only helps up to the rate limit on the
+      # Anthropic account itself — check that before relying on this number.
+      - key: LLM_RPM
+        value: "200"
+      - key: LLM_CALL_BUDGET
+        value: "900"
+      - key: MAX_TURNS
+        value: "6"
+      - key: MAX_SESSIONS
+        value: "120"
+
+      # Critical: a whole room on one WiFi network shares one public IP through
+      # NAT, so a per-IP cap applies to the entire class at once, not per student.
+      # At the default of 3, the fourth person to scan is refused with a 429.
+      - key: MAX_SESSIONS_PER_IP
+        value: "200"
