@@ -113,6 +113,13 @@ Nothing in the app is Render-specific: it reads `PORT`, `DB_PATH`, `LOGS_TOKEN`,
 the `LLM_*` settings and the classroom caps from the environment, binds all interfaces, and trusts
 the proxy. Only two things need attention on a new host.
 
+**Declare the right Node version.** `package.json` > `engines` > `node` must stay at `>=22`:
+`better-sqlite3@13` itself requires Node >=22, and build platforms resolve the runtime from our
+`engines` field, not from the dependency's. With `>=20` declared, Railway's Railpack installed Node
+20.20.2 and the prebuilt binding segfaulted inside `new Database()` — the process died before
+`app.listen`, so the build looked clean and only the health check failed, with nothing in the log but
+`Segmentation fault`. Loosening `engines` below the strictest dependency reintroduces this.
+
 **Skip the native build.** `better-sqlite3` ships prebuilt binaries in `prebuilds/` and loads them
 in its own `lib/binding.js`, but it also has a `binding.gyp` and no install script, so npm runs
 `node-gyp rebuild` by default and compiles SQLite from source — minutes of build time producing a

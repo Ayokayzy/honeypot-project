@@ -10,7 +10,7 @@
     "import-logs": "node scripts/import-logs.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
