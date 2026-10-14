@@ -247,6 +247,18 @@
     </div>
   </div>
 
+  <div class="section-title">LLM usage</div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="label">LLM calls</div>
+      <div class="value" id="t-llm-calls">—</div>
+      <div class="sub" id="t-llm-budget"></div>
+    </div>
+    <div class="tile"><div class="label">Fallbacks</div><div class="value" id="t-llm-fallbacks">—</div></div>
+    <div class="tile"><div class="label">Failures</div><div class="value" id="t-llm-failures">—</div></div>
+    <div class="tile"><div class="label">Closed sessions</div><div class="value" id="t-llm-closed">—</div></div>
+  </div>
+
   <div class="section-title">Tactic frequency</div>
   <div class="card">
     <div class="chart-wrap" id="tactic-wrap">
@@ -333,6 +345,14 @@
       }
       $('t-top').textContent = topName;
       $('t-top-pct').textContent = topPct;
+
+      const llm = stats.llm || {};
+      $('t-llm-calls').textContent = llm.calls_used != null ? llm.calls_used : '—';
+      $('t-llm-budget').textContent =
+        llm.calls_budget != null ? 'of ' + llm.calls_budget + ' budget' : '';
+      $('t-llm-fallbacks').textContent = llm.fallbacks != null ? llm.fallbacks : '—';
+      $('t-llm-failures').textContent = llm.failures != null ? llm.failures : '—';
+      $('t-llm-closed').textContent = llm.sessions_closed != null ? llm.sessions_closed : '—';
     }
 
     function renderTacticChart(stats) {

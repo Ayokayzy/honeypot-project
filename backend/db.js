@@ -39,6 +39,34 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (applicant_id) REFERENCES applicants(id)
   );
+
+  CREATE TABLE IF NOT EXISTS llm_counters (
+    key TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
+  );
 `);
+
+// Additive migration: SQLite has no ADD COLUMN IF NOT EXISTS, so we inspect
+// pragma_table_info and only add what's missing. This leaves existing deployments
+// (which already have populated applicants/conversation_log rows) in place.
+function columnExists(table, column) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all();
+  return rows.some((r) => r.name === column);
+}
+
+function addColumn(table, column, decl) {
+  if (!columnExists(table, column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
+}
+
+addColumn('applicants', 'tactic_choice', 'TEXT');
+addColumn('applicants', 'turns_used', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('applicants', 'closed', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('conversation_log', 'source', "TEXT"); // 'opening' | 'suggestion' | 'typed'
+addColumn('conversation_log', 'reply_origin', "TEXT"); // 'ai' | 'fallback'
+
+// Seed the lifetime-call counter row so increments can run unconditionally.
+db.prepare("INSERT OR IGNORE INTO llm_counters (key, value) VALUES ('calls_total', 0)").run();
 
 module.exports = db;
