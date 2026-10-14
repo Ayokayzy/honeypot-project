@@ -5,14 +5,21 @@ services:
     name: honeypot
     runtime: node
     plan: free
-    buildCommand: npm ci
+    # --ignore-scripts skips npm's default node-gyp build. better-sqlite3 has a
+    # binding.gyp and no install script, which makes npm compile SQLite from source
+    # even though the package ships prebuilt binaries in prebuilds/ and loads them
+    # directly (see its lib/binding.js). Compiling took minutes on Render's builder
+    # and produced a binary that is never used. Note this skips install scripts for
+    # every dependency, so re-check it if a future dependency needs one.
+    buildCommand: npm ci --omit=dev --ignore-scripts
     startCommand: npm start
     healthCheckPath: /api/ping
     envVars:
       - key: NODE_ENV
         value: production
-      # Pinned rather than left to Render's default so better-sqlite3 resolves a
-      # prebuilt binary instead of compiling from source during the build.
+      # Pinned for reproducibility rather than tracking Render's default. The
+      # better-sqlite3 prebuilds are N-API, so they are ABI-stable and do not
+      # depend on this value.
       - key: NODE_VERSION
         value: "22"
       # Render generates this secret and shows it in the dashboard; GET /api/logs
