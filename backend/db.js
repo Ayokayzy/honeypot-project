@@ -6,9 +6,25 @@ const fs = require('fs');
 // first because a fresh container has no data/ dir (it holds only the ignored .db file,
 // so git does not carry it) and better-sqlite3 will not create missing parents.
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'honeypot.db');
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
-const db = new Database(DB_PATH);
+// This runs before the server listens, so a failure here looks like a healthy build
+// followed by a platform health check that never passes. Say what went wrong instead
+// of exiting on a raw mkdir stack trace.
+let db;
+try {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  db = new Database(DB_PATH);
+} catch (err) {
+  console.error(`\nFATAL: cannot open the database at ${DB_PATH}`);
+  console.error(`  ${err.code || 'error'}: ${err.message}\n`);
+  console.error('DB_PATH is currently ' + (process.env.DB_PATH ? `set to "${process.env.DB_PATH}"` : 'unset (using the bundled default)'));
+  console.error('If it points at a mounted volume, check that the volume exists and that');
+  console.error('its mount path matches DB_PATH exactly. Unsetting DB_PATH falls back to');
+  console.error('./data inside the container, which works but is lost on every restart.\n');
+  process.exit(1);
+}
+
+console.log(`database: ${DB_PATH}`);
 
 // Write-ahead logging lets readers run while a write is in flight and commits without
 // rewriting the rollback journal each time; NORMAL stops fsync-ing on every single commit.
