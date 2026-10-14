@@ -107,6 +107,29 @@ people sent the link without exposing it to people who weren't.
 
 `data/` is gitignored because the DB holds names, emails, phone numbers and IPs.
 
+### Deploying somewhere other than Render
+
+Nothing in the app is Render-specific: it reads `PORT`, `DB_PATH`, `LOGS_TOKEN`, `ADMIN_PASSWORD`,
+the `LLM_*` settings and the classroom caps from the environment, binds all interfaces, and trusts
+the proxy. Only two things need attention on a new host.
+
+**Skip the native build.** `better-sqlite3` ships prebuilt binaries in `prebuilds/` and loads them
+in its own `lib/binding.js`, but it also has a `binding.gyp` and no install script, so npm runs
+`node-gyp rebuild` by default and compiles SQLite from source — minutes of build time producing a
+binary that is never loaded. Where the install command is yours, pass `--ignore-scripts`. Where the
+platform runs `npm install` for you (Railway, Heroku and most buildpack hosts), set the environment
+variable `NPM_CONFIG_IGNORE_SCRIPTS=true`, which npm honours the same way. Either drops the install
+to a couple of seconds.
+
+**Point `DB_PATH` at a mounted volume** if the host offers one, otherwise the database is lost on
+every restart — including the `llm_counters` row holding the lifetime LLM call budget.
+
+Railway specifically: connect the repo, set the env vars above, set the healthcheck to `/api/ping`,
+and leave the per-service Serverless setting **off** — it sleeps a service after ~5 minutes idle and
+the waking request can return a 502. Railway's Config-as-Code (`railway.json`) is deprecated, with
+legacy services supported only until 2026-12-01, so configure it in the dashboard rather than
+committing a config file.
+
 ### Load characteristics
 
 Measured with 90 concurrent clients each submitting a form plus three follow-ups (450 requests),
